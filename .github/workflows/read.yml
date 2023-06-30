@@ -1,0 +1,49 @@
+name: semgrep-sast-scan-and-import-to-defectdojo
+on:
+  push
+jobs:
+  semgrep-sast-scan:
+    name: semgrep sast scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - name: checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: semgrep scan
+        id: semgrep-scan
+        run: |
+          mkdir -p semgrep/results
+          semgrep --config auto --error --json --output=semgrep/results/semgrep.json
+      - name: upload semgrep results
+        id: upload-semgrep-results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-results
+          path: semgrep/results/
+
+  import-semgrep-report:
+    name: import semgrep report
+    runs-on: ubuntu-latest
+    steps:
+      - name: download scan results artifact
+        id: download-scan-results-artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: semgrep-results
+      - name: import scan results into defectdojo
+        id: import-scan-results-into-defectdojo
+        uses: portswigger-cloud/defectdojo-github-action@v1
+        with:
+          defectdojo-url: https://defectdojo.example.con
+          defectdojo-username: ${{ secrets.defectdojo-username }}
+          defectdojo-password: ${{ secrets.defectdojo-password }}
+          defectdojo-product-type: example-product-type
+          defectdojo-product: example-product
+          defectdojo-environment-type: Production
+          defectdojo-scan-type: Semgrep JSON Report
+          defectdojo-engagement-name: Github Actions Initiated SAST Scan
+          scan-results-file-name: semgrep.json
